@@ -2,21 +2,18 @@ name: Build Ghar Alert APK
 
 on:
   push:
+    branches: [main]
   workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
-
-      - name: google-services.json check
-        run: |
-          if [ ! -f google-services.json ]; then
-            echo "::error::google-services.json upload nahi hui. Firebase se download karke repo mein daalo."
-            exit 1
-          fi
 
       - uses: actions/setup-java@v4
         with:
@@ -28,25 +25,48 @@ jobs:
           channel: stable
           cache: true
 
-      - name: Android project banao
+      - name: Build APK
+        id: build
+        shell: bash
         run: |
-          flutter --version
-          flutter create --org com.mau --project-name gharalert --platforms android .
-          rm -f test/widget_test.dart
-          cp -r android_overlay/app/src/main/. android/app/src/main/
-          cp google-services.json android/app/google-services.json
-          python3 ci/patch_android.py android
-
-      - name: APK build karo
-        run: |
-          flutter pub get
-          flutter build apk --release
-
-      - name: APK rename
-        run: cp build/app/outputs/flutter-apk/app-release.apk GharAlert.apk
+          set -o pipefail
+          {
+            echo "=== commit: $GITHUB_SHA"
+            flutter --version
+            test -f google-services.json || { echo "google-services.json missing"; exit 1; }
+            flutter create --org com.mau --project-name gharalert --platforms android .
+            rm -f test/widget_test.dart
+            cp -r android_overlay/app/src/main/. android/app/src/main/
+            cp google-services.json android/app/google-services.json
+            python3 ci/patch_android.py android
+            echo "=== settings.gradle.kts"; cat android/settings.gradle.kts
+            echo "=== app/build.gradle.kts"; cat android/app/build.gradle.kts
+            flutter pub get
+            flutter build apk --release
+            cp build/app/outputs/flutter-apk/app-release.apk GharAlert.apk
+            echo "=== BUILD OK"
+          } 2>&1 | tee build.log
 
       - uses: actions/upload-artifact@v4
+        if: success()
         with:
           name: GharAlert-APK
           path: GharAlert.apk
           retention-days: 30
+
+      # APK aur log "build-output" branch mein daalo taaki bina Actions khole mil jaye
+      - name: Publish output branch
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p /tmp/out
+          cp build.log /tmp/out/ 2>/dev/null || echo "no log" > /tmp/out/build.log
+          cp GharAlert.apk /tmp/out/ 2>/dev/null || true
+          echo "${{ job.status }} $GITHUB_SHA $(date -u)" > /tmp/out/STATUS.txt
+          cd /tmp/out
+          git init -q -b build-output
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git add -A
+          git commit -q -m "Build output for $GITHUB_SHA"
+          git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" build-output
