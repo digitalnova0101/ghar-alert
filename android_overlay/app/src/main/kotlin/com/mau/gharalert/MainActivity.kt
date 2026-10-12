@@ -4,7 +4,6 @@ import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Intent
-import android.media.AudioAttributes
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -17,8 +16,10 @@ import io.flutter.plugin.common.MethodChannel
 class MainActivity : FlutterFragmentActivity() {
 
     companion object {
-        const val CHANNEL_NORMAL = "ghar_alarm_v1"
-        const val CHANNEL_DND = "ghar_alarm_dnd_v1"
+        // v2: channel khud awaaz nahi bajata, siren plugin alarm volume pe bajata hai
+        const val CHANNEL_NORMAL = "ghar_alarm_v2"
+        const val CHANNEL_DND = "ghar_alarm_dnd_v2"
+        val OLD_CHANNELS = listOf("ghar_alarm_v1", "ghar_alarm_dnd_v1")
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -103,13 +104,8 @@ class MainActivity : FlutterFragmentActivity() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return id
         if (nm().getNotificationChannel(id) == null) {
             val channel = NotificationChannel(id, "Ghar ka alarm", NotificationManager.IMPORTANCE_HIGH)
-            channel.description = "Camera mein khatra dikhne par tez alarm"
-            val sound = Uri.parse("android.resource://$packageName/${R.raw.siren}")
-            val attrs = AudioAttributes.Builder()
-                .setUsage(AudioAttributes.USAGE_ALARM)
-                .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                .build()
-            channel.setSound(sound, attrs)
+            channel.description = "Camera mein khatra dikhne par alert"
+            channel.setSound(null, null)
             channel.enableVibration(true)
             channel.vibrationPattern = longArrayOf(0, 800, 400, 800, 400, 800)
             channel.lockscreenVisibility = Notification.VISIBILITY_PUBLIC
@@ -117,6 +113,7 @@ class MainActivity : FlutterFragmentActivity() {
             nm().createNotificationChannel(channel)
         }
         if (dnd) nm().deleteNotificationChannel(CHANNEL_NORMAL)
+        OLD_CHANNELS.forEach { nm().deleteNotificationChannel(it) }
         return id
     }
 

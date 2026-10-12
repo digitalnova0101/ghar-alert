@@ -35,6 +35,7 @@ Future<void> main() async {
   final launch = await notifications.getNotificationAppLaunchDetails();
   Widget home = const SplashScreen();
   final resp = launch?.notificationResponse;
+  if (resp?.actionId == ackActionId) await cancelAlarm();
   if ((launch?.didNotificationLaunchApp ?? false) && (resp?.payload?.isNotEmpty ?? false)) {
     home = AlertScreen(alertId: resp!.payload!, autoAck: resp.actionId == ackActionId);
   }
@@ -66,6 +67,7 @@ Future<void> _connectFirebase() async {
 }
 
 void _onNotificationTap(NotificationResponse response) {
+  if (response.actionId == ackActionId) cancelAlarm();
   final id = response.payload;
   if (id == null || id.isEmpty) return;
   _openAlert(id, autoAck: response.actionId == ackActionId);

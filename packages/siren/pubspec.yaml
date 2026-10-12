@@ -1,0 +1,19 @@
+name: siren
+description: Ghar Alert ka siren - alarm volume pe bajta hai, silent phone pe bhi.
+version: 0.0.1
+publish_to: 'none'
+
+environment:
+  sdk: ^3.10.0
+  flutter: ">=3.27.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+flutter:
+  plugin:
+    platforms:
+      android:
+        package: com.mau.siren
+        pluginClass: SirenPlugin

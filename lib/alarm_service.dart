@@ -4,6 +4,7 @@ import 'dart:ui';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:siren/siren.dart';
 
 import 'app_state.dart';
 import 'l10n.dart';
@@ -12,7 +13,7 @@ const String fcmTopic = 'ghar_alerts';
 const int alarmNotifId = 1001;
 const int infoNotifId = 1002;
 const int quietNotifId = 1003;
-const String defaultAlarmChannel = 'ghar_alarm_v1';
+const String defaultAlarmChannel = 'ghar_alarm_v2';
 const String infoChannelId = 'ghar_info_v1';
 const String ackActionId = 'ack';
 const String smallIcon = '@drawable/ic_stat_shield';
@@ -83,9 +84,8 @@ Future<void> showAlarm({
     priority: Priority.max,
     category: AndroidNotificationCategory.alarm,
     fullScreenIntent: true,
-    playSound: true,
-    sound: const RawResourceAndroidNotificationSound('siren'),
-    audioAttributesUsage: AudioAttributesUsage.alarm,
+    // Awaaz notification se nahi, Siren plugin se (alarm volume pe, har phone pe bajta hai)
+    playSound: false,
     enableVibration: true,
     vibrationPattern: Int64List.fromList(<int>[0, 800, 400, 800, 400, 800]),
     additionalFlags: Int32List.fromList(<int>[_flagInsistent]),
@@ -113,6 +113,7 @@ Future<void> showAlarm({
     notificationDetails: NotificationDetails(android: android),
     payload: alertId,
   );
+  await Siren.start(title: '🚨 $camera', body: reason);
 }
 
 /// "Ghar pe" mode: siren nahi, normal notification.
@@ -139,7 +140,10 @@ Future<void> showQuietAlert({
   );
 }
 
-Future<void> cancelAlarm() => notifications.cancel(id: alarmNotifId);
+Future<void> cancelAlarm() async {
+  await Siren.stop();
+  await notifications.cancel(id: alarmNotifId);
+}
 
 Future<void> showInfo(String title, String body) async {
   final android = AndroidNotificationDetails(
