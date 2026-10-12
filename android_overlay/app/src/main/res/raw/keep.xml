@@ -1,4 +1,4 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Release build mein siren ki awaaz hatne na paaye -->
+<!-- Release build mein yeh resources hatne na paayein (Dart se naam se use hote hain) -->
 <resources xmlns:tools="http://schemas.android.com/tools"
-    tools:keep="@raw/siren" />
+    tools:keep="@raw/siren,@drawable/ic_stat_shield,@drawable/splash_icon,@drawable/splash_logo" />

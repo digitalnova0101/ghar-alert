@@ -8,6 +8,7 @@ from pathlib import Path
 
 GMS_VERSION = "4.4.3"
 DESUGAR = 'coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")'
+APPCOMPAT = 'implementation("androidx.appcompat:appcompat:1.7.1")'
 
 
 def die(msg):
@@ -54,7 +55,7 @@ def patch_app(path: Path):
         if n == 0:
             die(f"{path}: compileOptions block nahi mila")
     if "desugar_jdk_libs" not in text:
-        text = text.rstrip() + f"\n\ndependencies {{\n    {DESUGAR}\n}}\n"
+        text = text.rstrip() + f"\n\ndependencies {{\n    {DESUGAR}\n    {APPCOMPAT}\n}}\n"
 
     path.write_text(text)
     print("patched", path)

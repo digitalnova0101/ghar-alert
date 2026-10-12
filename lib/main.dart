@@ -2,42 +2,41 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import 'alarm_service.dart';
-import 'native.dart';
+import 'app_state.dart';
+import 'db.dart';
+import 'permissions.dart';
 import 'screens/alert_screen.dart';
-import 'screens/home_screen.dart';
+import 'screens/splash_screen.dart';
+import 'theme.dart';
 
 final navigatorKey = GlobalKey<NavigatorState>();
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
+    statusBarColor: Colors.transparent,
+    statusBarIconBrightness: Brightness.light,
+    systemNavigationBarColor: C.surface,
+    systemNavigationBarIconBrightness: Brightness.light,
+  ));
+
   await Firebase.initializeApp();
   FirebaseMessaging.onBackgroundMessage(firebaseBackgroundHandler);
-
+  await AppState.load();
   await initNotifications(onTap: _onNotificationTap);
-
-  // Siren wala alarm channel (DND permission mili ho to DND bypass bhi)
-  try {
-    final channelId = await Native.setupAlarmChannel();
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(Prefs.alarmChannel, channelId);
-  } catch (_) {}
-
+  await refreshAlarmChannel();
   await _connectFirebase();
 
-  // Kya app alarm notification se khula? (lock screen full-screen alert)
+  // App alarm notification se khula? (lock screen pe full-screen alert)
   final launch = await notifications.getNotificationAppLaunchDetails();
-  Widget home = const HomeScreen();
+  Widget home = const SplashScreen();
   final resp = launch?.notificationResponse;
-  if ((launch?.didNotificationLaunchApp ?? false) &&
-      (resp?.payload?.isNotEmpty ?? false)) {
-    home = AlertScreen(
-      alertId: resp!.payload!,
-      autoAck: resp.actionId == ackActionId,
-    );
+  if ((launch?.didNotificationLaunchApp ?? false) && (resp?.payload?.isNotEmpty ?? false)) {
+    home = AlertScreen(alertId: resp!.payload!, autoAck: resp.actionId == ackActionId);
   }
 
   runApp(GharAlertApp(home: home));
@@ -56,11 +55,11 @@ Future<void> _connectFirebase() async {
   } catch (e) {
     debugPrint('Topic error: $e');
   }
+  Db.touchMember().ignore();
 
-  // App khula ho tab alert aaye
   FirebaseMessaging.onMessage.listen((message) async {
     await handleRemoteMessage(message);
-    if (message.data['type'] == 'alert') {
+    if (message.data['type'] == 'alert' && message.data['level'] != 'quiet') {
       _openAlert(message.data['alertId'] ?? '', autoAck: false);
     }
   });
@@ -79,9 +78,36 @@ void _openAlert(String alertId, {required bool autoAck}) {
   ));
 }
 
-class GharAlertApp extends StatelessWidget {
+class GharAlertApp extends StatefulWidget {
   const GharAlertApp({super.key, required this.home});
   final Widget home;
+
+  @override
+  State<GharAlertApp> createState() => _GharAlertAppState();
+}
+
+class _GharAlertAppState extends State<GharAlertApp> {
+  @override
+  void initState() {
+    super.initState();
+    AppState.lang.addListener(_rebuildAll);
+  }
+
+  @override
+  void dispose() {
+    AppState.lang.removeListener(_rebuildAll);
+    super.dispose();
+  }
+
+  /// Bhasha badalne pe har screen dobara banao (navigation waisi hi rahe).
+  void _rebuildAll() {
+    void mark(Element e) {
+      e.markNeedsBuild();
+      e.visitChildren(mark);
+    }
+
+    (context as Element).visitChildren(mark);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -89,18 +115,9 @@ class GharAlertApp extends StatelessWidget {
       title: 'Ghar Alert',
       navigatorKey: navigatorKey,
       debugShowCheckedModeBanner: false,
-      themeMode: ThemeMode.system,
-      theme: ThemeData(
-        colorSchemeSeed: const Color(0xFFC62828),
-        brightness: Brightness.light,
-        useMaterial3: true,
-      ),
-      darkTheme: ThemeData(
-        colorSchemeSeed: const Color(0xFFC62828),
-        brightness: Brightness.dark,
-        useMaterial3: true,
-      ),
-      home: home,
+      theme: buildTheme(),
+      themeMode: ThemeMode.dark,
+      home: widget.home,
     );
   }
 }

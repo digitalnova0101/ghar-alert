@@ -1,43 +1,43 @@
 import 'dart:typed_data';
+import 'dart:ui';
 
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+
+import 'app_state.dart';
+import 'l10n.dart';
 
 const String fcmTopic = 'ghar_alerts';
 const int alarmNotifId = 1001;
 const int infoNotifId = 1002;
+const int quietNotifId = 1003;
 const String defaultAlarmChannel = 'ghar_alarm_v1';
 const String infoChannelId = 'ghar_info_v1';
 const String ackActionId = 'ack';
+const String smallIcon = '@drawable/ic_stat_shield';
 
 /// Android ka FLAG_INSISTENT: awaaz tab tak loop mein bajti hai jab tak
 /// notification hata na di jaye.
 const int _flagInsistent = 4;
+const Color _danger = Color(0xFFFF4D4F);
+const Color _brand = Color(0xFF7C8CFF);
 
-final FlutterLocalNotificationsPlugin notifications =
-    FlutterLocalNotificationsPlugin();
-
-class Prefs {
-  static const myName = 'my_name';
-  static const alarmChannel = 'alarm_channel';
-}
+final FlutterLocalNotificationsPlugin notifications = FlutterLocalNotificationsPlugin();
 
 /// App band ho tab bhi FCM yahan aata hai (alag isolate mein).
 @pragma('vm:entry-point')
 Future<void> firebaseBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp();
+  await AppState.load();
   await initNotifications();
   await handleRemoteMessage(message);
 }
 
-Future<void> initNotifications({
-  DidReceiveNotificationResponseCallback? onTap,
-}) async {
+Future<void> initNotifications({DidReceiveNotificationResponseCallback? onTap}) async {
   await notifications.initialize(
     settings: const InitializationSettings(
-      android: AndroidInitializationSettings('@mipmap/ic_launcher'),
+      android: AndroidInitializationSettings(smallIcon),
     ),
     onDidReceiveNotificationResponse: onTap,
   );
@@ -45,21 +45,26 @@ Future<void> initNotifications({
 
 Future<void> handleRemoteMessage(RemoteMessage message) async {
   final data = message.data;
-  final type = data['type'];
-  if (type == 'alert') {
-    await showAlarm(
-      alertId: data['alertId'] ?? '',
-      camera: data['camera'] ?? 'Camera',
-      reason: data['reason'] ?? 'Kuch gadbad dikh rahi hai',
-    );
-  } else if (type == 'ack') {
-    await cancelAlarm();
-    final prefs = await SharedPreferences.getInstance();
-    final me = prefs.getString(Prefs.myName);
-    final by = data['by'] ?? 'Koi';
-    if (by != me) {
-      await showInfo('👀 $by dekh raha hai', 'Alarm band kar diya gaya hai.');
-    }
+  switch (data['type']) {
+    case 'alert':
+      final alertId = data['alertId'] ?? '';
+      final camera = data['camera'] ?? 'Camera';
+      final reason = data['reason'] ?? tr('alert_default_reason');
+      if (data['level'] == 'quiet') {
+        await showQuietAlert(alertId: alertId, camera: camera, reason: reason);
+      } else {
+        await showAlarm(alertId: alertId, camera: camera, reason: reason);
+      }
+    case 'ack':
+      await cancelAlarm();
+      await notifications.cancel(id: quietNotifId);
+      final by = data['by'] ?? '?';
+      if (by != AppState.myName.value) {
+        await showInfo(tr('notif_ack_title', {'name': by}), tr('notif_ack_body'));
+      }
+    case 'summary':
+    case 'info':
+      await showInfo(data['title'] ?? 'Ghar Alert', data['body'] ?? '');
   }
 }
 
@@ -68,13 +73,12 @@ Future<void> showAlarm({
   required String camera,
   required String reason,
 }) async {
-  final prefs = await SharedPreferences.getInstance();
-  final channelId = prefs.getString(Prefs.alarmChannel) ?? defaultAlarmChannel;
+  final channelId = AppState.prefs.getString(Prefs.alarmChannel) ?? defaultAlarmChannel;
 
   final android = AndroidNotificationDetails(
     channelId,
-    'Ghar ka alarm',
-    channelDescription: 'Camera mein khatra dikhne par tez alarm',
+    tr('channel_alarm'),
+    channelDescription: tr('channel_alarm_desc'),
     importance: Importance.max,
     priority: Priority.max,
     category: AndroidNotificationCategory.alarm,
@@ -87,13 +91,15 @@ Future<void> showAlarm({
     additionalFlags: Int32List.fromList(<int>[_flagInsistent]),
     ongoing: true,
     autoCancel: false,
+    color: _danger,
+    colorized: true,
     visibility: NotificationVisibility.public,
-    timeoutAfter: 10 * 60 * 1000, // 10 min baad apne aap band
+    timeoutAfter: 10 * 60 * 1000,
     styleInformation: BigTextStyleInformation(reason),
-    actions: const <AndroidNotificationAction>[
+    actions: <AndroidNotificationAction>[
       AndroidNotificationAction(
         ackActionId,
-        'Main dekh raha hoon',
+        tr('btn_ack'),
         showsUserInterface: true,
         cancelNotification: true,
       ),
@@ -109,20 +115,52 @@ Future<void> showAlarm({
   );
 }
 
+/// "Ghar pe" mode: siren nahi, normal notification.
+Future<void> showQuietAlert({
+  required String alertId,
+  required String camera,
+  required String reason,
+}) async {
+  final android = AndroidNotificationDetails(
+    infoChannelId,
+    tr('channel_info'),
+    channelDescription: tr('channel_info_desc'),
+    importance: Importance.high,
+    priority: Priority.high,
+    color: _brand,
+    styleInformation: BigTextStyleInformation(reason),
+  );
+  await notifications.show(
+    id: quietNotifId,
+    title: '👁️ $camera',
+    body: reason,
+    notificationDetails: NotificationDetails(android: android),
+    payload: alertId,
+  );
+}
+
 Future<void> cancelAlarm() => notifications.cancel(id: alarmNotifId);
 
 Future<void> showInfo(String title, String body) async {
-  const android = AndroidNotificationDetails(
+  final android = AndroidNotificationDetails(
     infoChannelId,
-    'Ghar alert updates',
-    channelDescription: 'Kisne alert dekha, system ki jaankari',
+    tr('channel_info'),
+    channelDescription: tr('channel_info_desc'),
     importance: Importance.high,
     priority: Priority.high,
+    color: _brand,
+    styleInformation: BigTextStyleInformation(body),
   );
   await notifications.show(
     id: infoNotifId,
     title: title,
     body: body,
-    notificationDetails: const NotificationDetails(android: android),
+    notificationDetails: NotificationDetails(android: android),
   );
 }
+
+Future<void> playTestAlarm() => showAlarm(
+      alertId: '',
+      camera: tr('test_alarm_title'),
+      reason: tr('test_alarm_body'),
+    );

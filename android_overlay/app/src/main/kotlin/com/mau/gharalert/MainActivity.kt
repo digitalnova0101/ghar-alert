@@ -10,11 +10,11 @@ import android.os.Build
 import android.os.Bundle
 import android.os.PowerManager
 import android.provider.Settings
-import io.flutter.embedding.android.FlutterActivity
+import io.flutter.embedding.android.FlutterFragmentActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 
-class MainActivity : FlutterActivity() {
+class MainActivity : FlutterFragmentActivity() {
 
     companion object {
         const val CHANNEL_NORMAL = "ghar_alarm_v1"
@@ -73,6 +73,14 @@ class MainActivity : FlutterActivity() {
                             result.success(null)
                         }
                         "openSeeEasy" -> result.success(openSeeEasy())
+                        "dial" -> {
+                            val number = call.argument<String>("number") ?: ""
+                            open(Intent(Intent.ACTION_DIAL, Uri.parse("tel:" + Uri.encode(number))))
+                            result.success(null)
+                        }
+                        "appVersion" -> result.success(
+                            packageManager.getPackageInfo(packageName, 0).versionName ?: ""
+                        )
                         else -> result.notImplemented()
                     }
                 } catch (e: Exception) {
