@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "801333311554",
+    "project_id": "home-alerts-67231",
+    "storage_bucket": "home-alerts-67231.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:801333311554:android:632e7fee9f15a1645d95db",
+        "android_client_info": {
+          "package_name": "com.mau.gharalert"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBGpxzeNVwtm1ntqy_YOmrCrB7lACVlYIo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
