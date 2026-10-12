@@ -1,0 +1,6 @@
+build/
+.dart_tool/
+*.iml
+.idea/
+firebase-key.json
+*adminsdk*.json

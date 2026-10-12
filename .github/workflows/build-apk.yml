@@ -1,0 +1,52 @@
+name: Build Ghar Alert APK
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: google-services.json check
+        run: |
+          if [ ! -f google-services.json ]; then
+            echo "::error::google-services.json upload nahi hui. Firebase se download karke repo mein daalo."
+            exit 1
+          fi
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Android project banao
+        run: |
+          flutter --version
+          flutter create --org com.mau --project-name gharalert --platforms android .
+          rm -f test/widget_test.dart
+          cp -r android_overlay/app/src/main/. android/app/src/main/
+          cp google-services.json android/app/google-services.json
+          python3 ci/patch_android.py android
+
+      - name: APK build karo
+        run: |
+          flutter pub get
+          flutter build apk --release
+
+      - name: APK rename
+        run: cp build/app/outputs/flutter-apk/app-release.apk GharAlert.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: GharAlert-APK
+          path: GharAlert.apk
+          retention-days: 30

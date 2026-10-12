@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Release build mein siren ki awaaz hatne na paaye -->
+<resources xmlns:tools="http://schemas.android.com/tools"
+    tools:keep="@raw/siren" />
