@@ -42,8 +42,9 @@ jobs:
             echo "=== settings.gradle.kts"; cat android/settings.gradle.kts
             echo "=== app/build.gradle.kts"; cat android/app/build.gradle.kts
             flutter pub get
-            flutter build apk --release
-            cp build/app/outputs/flutter-apk/app-release.apk GharAlert.apk
+            flutter build apk --release --split-per-abi
+            cp build/app/outputs/flutter-apk/app-arm64-v8a-release.apk GharAlert.apk
+            cp build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk GharAlert-old-phones.apk
             echo "=== BUILD OK"
           } 2>&1 | tee build.log
 
@@ -51,7 +52,7 @@ jobs:
         if: success()
         with:
           name: GharAlert-APK
-          path: GharAlert.apk
+          path: GharAlert*.apk
           retention-days: 30
 
       # APK aur log "build-output" branch mein daalo taaki bina Actions khole mil jaye
@@ -61,7 +62,7 @@ jobs:
         run: |
           mkdir -p /tmp/out
           cp build.log /tmp/out/ 2>/dev/null || echo "no log" > /tmp/out/build.log
-          cp GharAlert.apk /tmp/out/ 2>/dev/null || true
+          cp GharAlert*.apk /tmp/out/ 2>/dev/null || true
           echo "${{ job.status }} $GITHUB_SHA $(date -u)" > /tmp/out/STATUS.txt
           cd /tmp/out
           git init -q -b build-output
