@@ -1,0 +1,41 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Alerts: app padh sakta hai, aur "kisne dekha" ek hi baar likh sakta hai.
+    match /alerts/{alertId} {
+      allow read: if request.auth != null;
+      allow update: if request.auth != null
+        && resource.data.ackBy == null
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['ackBy', 'ackAt'])
+        && request.resource.data.ackBy is string
+        && request.resource.data.ackBy.size() <= 40;
+    }
+
+    // System online, cameras, purane phone ki battery
+    match /status/{docId} {
+      allow read: if request.auth != null;
+    }
+
+    // Ghar ki settings: mode, raat ka samay, cameras, contacts, summary
+    match /config/{docId} {
+      allow read, write: if request.auth != null;
+    }
+
+    // "Abhi ki photo" ki request aur photos
+    match /requests/{docId} {
+      allow read, write: if request.auth != null;
+    }
+    match /snapshots/{docId} {
+      allow read: if request.auth != null;
+    }
+
+    // Family list: har phone sirf apna record badal sakta hai
+    match /members/{uid} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.uid == uid
+        && request.resource.data.name is string
+        && request.resource.data.name.size() <= 40;
+    }
+  }
+}

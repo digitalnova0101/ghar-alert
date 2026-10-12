@@ -3,6 +3,7 @@ name: Build Ghar Alert APK
 on:
   push:
     branches: [main]
+    paths-ignore: ['old_phone/**', 'firebase/**', '*.md']
   workflow_dispatch:
 
 permissions:
